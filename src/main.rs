@@ -1,6 +1,6 @@
 use clap::Parser;
 use colored::Colorize;
-use redis::{AsyncCommands, Client, streams::StreamMaxlen};
+use redis::{AsyncCommands, Client, RedisResult, streams::StreamMaxlen};
 use redis::aio::{ConnectionManager, ConnectionManagerConfig};
 use socket2::{Domain, Protocol, Socket, Type};
 use std::net::{Ipv4Addr, SocketAddrV4};
@@ -11,9 +11,9 @@ mod edp;
 
 type Alarm = [(String, String); 6];
 
-async fn aeolus_task(sndr: Sender<Alarm>, mcast_addr: String, listen_port: u16)
+async fn aeolus_task(sndr: Sender<Alarm>, mcast_addr: String, listen_port: u16) -> std::io::Result<()>
 {
-  let sock2 = Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP)).unwrap();
+  let sock2 = Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP))?;
 
   let _ = sock2.set_reuse_address(true);
 
@@ -21,11 +21,11 @@ async fn aeolus_task(sndr: Sender<Alarm>, mcast_addr: String, listen_port: u16)
 
   let _ = sock2.bind(&addr.into());
 
-  let group: Ipv4Addr = mcast_addr.parse().unwrap();
+  let group: Ipv4Addr = mcast_addr.parse().map_err(|e| std::io::Error::other(e))?;
 
   let _ = sock2.join_multicast_v4(&group, &Ipv4Addr::UNSPECIFIED);
 
-  let sock = UdpSocket::from_std(sock2.into()).unwrap();
+  let sock = UdpSocket::from_std(sock2.into())?;
 
   println!("{}", format!("\nListening on port {listen_port} to multicast from address {mcast_addr}").white());
 
@@ -33,7 +33,7 @@ async fn aeolus_task(sndr: Sender<Alarm>, mcast_addr: String, listen_port: u16)
 
   loop
   {
-    let (len, _) = sock.recv_from(&mut buf).await.unwrap();
+    let (len, _) = sock.recv_from(&mut buf).await?;
 
     if len == buf.len() { println!("{}", "\nMax data received".bright_red()); }
 
@@ -129,7 +129,11 @@ async fn aeolus_task(sndr: Sender<Alarm>, mcast_addr: String, listen_port: u16)
           ("message".to_owned(),    edp.text.to_owned()),
         ];
 
-        let _ = sndr.send(alarm).await;
+        match sndr.send(alarm).await
+        {
+          Ok(_) => (),
+          Err(_) => return Ok(()),
+        }
 
         rec = &rec[192..];
       }
@@ -137,23 +141,28 @@ async fn aeolus_task(sndr: Sender<Alarm>, mcast_addr: String, listen_port: u16)
   }
 }
 
-async fn redis_task(mut rcvr: Receiver<Alarm>, redis_addr: String, redis_port: u16, stream_key: String)
+async fn redis_task(mut rcvr: Receiver<Alarm>, redis_addr: String, redis_port: u16, stream_key: String) -> RedisResult<()>
 {
   let uri = format!("redis://{redis_addr}:{redis_port}");
 
-  let client = Client::open(uri).unwrap();
+  let client = Client::open(uri)?;
 
   let config = ConnectionManagerConfig::new();
 
-  let mut cxnmgr = ConnectionManager::new_lazy_with_config(client, config).unwrap();
+  let mut cxnmgr = ConnectionManager::new_lazy_with_config(client, config)?;
 
   println!("{}", format!("\nUsing Redis at address {redis_addr} on port {redis_port} to stream {stream_key}").white());
 
   loop
   {
-    let alarm = rcvr.recv().await.unwrap();
-
-    let _: Result<(), _> = cxnmgr.xadd_maxlen(&stream_key, StreamMaxlen::Approx(9999), "*", &alarm).await;
+    match rcvr.recv().await
+    {
+      Some(alarm) =>
+      {
+        let _: Result<(), _> = cxnmgr.xadd_maxlen(&stream_key, StreamMaxlen::Approx(9999), "*", &alarm).await?;
+      },
+      None => return Ok(()),
+    }
   }
 }
 
