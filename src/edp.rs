@@ -14,17 +14,18 @@ pub fn be_i16(data: &[u8], idx:usize) -> i16
 {
   i16::from_be_bytes(data[idx..idx+2].try_into().unwrap())
 }
+
 pub struct EDP
 {
-  pub typecode: u8,   pub priority: u8,   pub trunk: u8,    pub node: u8,     pub ssn: u8,
-  pub bs: u8,         pub erp_type: u8,   pub dig_edp: u8,  pub broken: u8,   pub unused: u8,
+  pub typecode: u8,     pub priority: u8,       pub trunk: u8,        pub node: u8,       pub ssn: u8,
+  pub bs: u8,           pub erp_type: u8,       pub dig_edp: u8,      pub broken: u8,     pub unused: u8,
 
-  pub status: u16,    pub handler: u16,   pub alarm_list: i16,
+  pub status: u16,      pub handler: u16,       pub alarm_list: i16,
 
-  pub dev_index: u32,   pub dev_class: u32,   pub dev_type: u32,    pub seconds: u32,
-  pub seq_num: u32,     pub sound_id: u32,    pub speech_id: u32,   pub raw_data: u32,
+  pub dev_index: u32,   pub dev_class: u32,     pub dev_type: u32,    pub seconds: u32,
+  pub seq_num: u32,     pub sound_id: u32,      pub speech_id: u32,   pub raw_data: u32,
 
-  pub name: String,   pub full_name: String,  pub text: String,
+  pub name: String,     pub full_name: String,  pub text: String,
 }
 
 impl EDP
@@ -48,6 +49,7 @@ impl EDP
       text: str::from_utf8(&buf[128..192]).unwrap().trim_end_matches('\0').trim_end().to_string(),
     }
   }
+
   pub fn bypass(&self) -> u8    { ((self.status & 1) == 0)  as u8 }
   pub fn alarm(&self) -> u8     { ((self.status >>  1) & 1) as u8 }
   pub fn trigger(&self) -> u8   { ((self.status >>  2) & 1) as u8 }
@@ -145,12 +147,14 @@ impl EDP
     let line6c =
     {
       let txt = format!("low: {:3}   ", self.low());
-      if self.is_low_high() { txt.bright_red() } else if self.low() != 0 { txt.magenta() } else if self.is_digital() { txt.cyan() } else { txt.yellow() }
+      if self.is_low_high() { txt.bright_red() } else if self.low() != 0 { txt.magenta() }
+                                                 else if self.is_digital() { txt.cyan() } else { txt.yellow() }
     };
     let line6d =
     {
       let txt = format!("high: {:4}   ", self.high());
-      if self.is_low_high() { txt.bright_red() } else if self.high() != 0 { txt.magenta() } else if self.is_digital() { txt.cyan() } else { txt.yellow() }
+      if self.is_low_high() { txt.bright_red() } else if self.high() != 0 { txt.magenta() }
+                                                 else if self.is_digital() { txt.cyan() } else { txt.yellow() }
     };
     let line6e =
     {
