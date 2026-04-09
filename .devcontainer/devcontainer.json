@@ -1,0 +1,4 @@
+{
+  "name": "Rust",
+  "image": "adregistry.fnal.gov/dev-containers/rust:1.94.0"
+}
