@@ -27,7 +27,7 @@ async fn aeolus_task(sndr: Sender<Alarm>, mcast_addr: String, listen_port: u16)
 
   let sock = UdpSocket::from_std(sock2.into()).unwrap();
 
-  println!("{}", format!("\nListening on {} to multicast from {}", listen_port, mcast_addr).white());
+  println!("{}", format!("\nListening on port {listen_port} to multicast from address {mcast_addr}").white());
 
   let mut buf = [0u8; 9999];
 
@@ -139,7 +139,7 @@ async fn aeolus_task(sndr: Sender<Alarm>, mcast_addr: String, listen_port: u16)
 
 async fn redis_task(mut rcvr: Receiver<Alarm>, redis_addr: String, redis_port: u16, stream_key: String)
 {
-  let uri = format!("redis://{}:{}", redis_addr, redis_port);
+  let uri = format!("redis://{redis_addr}:{redis_port}");
 
   let client = Client::open(uri).unwrap();
 
@@ -147,7 +147,7 @@ async fn redis_task(mut rcvr: Receiver<Alarm>, redis_addr: String, redis_port: u
 
   let mut cxnmgr = ConnectionManager::new_lazy_with_config(client, config).unwrap();
 
-  println!("{}", format!("\nUsing Redis at {} on {} to {}", redis_addr, redis_port, stream_key).white());
+  println!("{}", format!("\nUsing Redis at address {redis_addr} on port {redis_port} to stream {stream_key}").white());
 
   loop
   {
