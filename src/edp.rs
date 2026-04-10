@@ -46,8 +46,8 @@ impl EDP
   {
     Self
     {
-      typecode: buf[0], priority: buf[1],   trunk: buf[2],          node: buf[3],         ssn: buf[4],
-      bs: buf[5],       erp_type: buf[6],   dig_edp: buf[7] != 0,   broken: buf[8] != 0,  unused: buf[9],
+      typecode: buf[0],   priority: buf[1],   trunk: buf[2],          node: buf[3],           ssn: buf[4],
+      bs: buf[5],         erp_type: buf[6],   dig_edp: buf[7] != 0,   broken: buf[8] != 0,    unused: buf[9],
 
       status: be_u16(buf, 10),  handler: be_u16(buf, 12), alarm_list: be_i16(buf, 14),
 
@@ -62,23 +62,23 @@ impl EDP
     }
   }
 
-  pub fn bypass(&self)   -> bool { (self.status &  1) == 0 }   //  reverse logic
-  pub fn alarm(&self)    -> bool { (self.status &  2) != 0 }
-  pub fn trigger(&self)  -> bool { (self.status &  4) != 0 }
-  pub fn inhibit(&self)  -> bool { (self.status &  8) != 0 }
-  pub fn reserved(&self) -> bool { (self.status & 16) != 0 }
+  pub fn bypass(&self)   -> bool { (self.status & (1 << 0)) == 0 }  //  reverse logic
+  pub fn alarm(&self)    -> bool { (self.status & (1 << 1)) != 0 }
+  pub fn trigger(&self)  -> bool { (self.status & (1 << 2)) != 0 }
+  pub fn inhibit(&self)  -> bool { (self.status & (1 << 3)) != 0 }
+  pub fn reserved(&self) -> bool { (self.status & (1 << 4)) != 0 }
 
-  pub fn q_code(&self) -> u8 { ((self.status >> 5) & 3) as u8 }   //  bits 32 64
+  pub fn q_code(&self) -> u8 { ((self.status >> 5) & 3) as u8 }   //  bits 5-6
 
-  pub fn dig_st(&self) -> bool { (self.status & 128) != 0 }
+  pub fn dig_st(&self) -> bool { (self.status & (1 << 7)) != 0 }
 
-  pub fn k_code(&self) -> u8 { ((self.status >> 8) & 7) as u8 }   //  bits 256 512 1024
+  pub fn k_code(&self) -> u8 { ((self.status >> 8) & 7) as u8 }   //  bits 8-10
 
-  pub fn low(&self)       -> bool { (self.status &  2048) != 0 }
-  pub fn high(&self)      -> bool { (self.status &  4096) != 0 }
-  pub fn exception(&self) -> bool { (self.status &  8192) != 0 }
-  pub fn logging(&self)   -> bool { (self.status & 16384) != 0 }
-  pub fn display(&self)   -> bool { (self.status & 32768) != 0 }
+  pub fn low(&self)       -> bool { (self.status & (1 << 11)) != 0 }
+  pub fn high(&self)      -> bool { (self.status & (1 << 12)) != 0 }
+  pub fn exception(&self) -> bool { (self.status & (1 << 13)) != 0 }
+  pub fn logging(&self)   -> bool { (self.status & (1 << 14)) != 0 }
+  pub fn display(&self)   -> bool { (self.status & (1 << 15)) != 0 }
 
   pub fn is_digital(&self)  -> bool { self.dig_edp || self.dig_st() }
   pub fn is_mismatch(&self) -> bool { self.dig_edp != self.dig_st() }

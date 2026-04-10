@@ -48,102 +48,115 @@ async fn aeolus_task(sndr: Sender<Alarm>, mcast_addr: String, listen_port: u16) 
     let ip_ver  = buf[ 0] as f32 + buf[ 1] as f32 / 10.0;
     let mc_ver  = buf[20] as f32 + buf[21] as f32 / 10.0;
     let seq_num = edp::be_u32(&buf, 24);
+    let typecode: u8    = buf[32];
 
-    if len == 32+28
+    match typecode
     {
-      let hb = &buf[32..];
-
-      let typecode    = hb[0];
-      let seconds    = edp::be_u32(&hb, 4);
-      let edm_seq    = edp::be_u32(&hb, 8);
-      let evt_seq    = edp::be_u32(&hb, 12);
-      let evt_num    = edp::be_u32(&hb, 16);
-      let hb_seq     = edp::be_u32(&hb, 20);
-      let count      = edp::be_u32(&hb, 24);
-
-      println!("{}", format!("HB  ip_ver: {ip_ver:.1}   mc_ver: {mc_ver:.1}   seq_num: {seq_num}   typecode: {typecode}   seconds: {seconds}").green());
-      println!("{}", format!("    edm_seq: {edm_seq}    evt_seq: {evt_seq}    evt_num: {evt_num}   hb_seq: {hb_seq:4}   count: {count:3}").green());
-    }
-    else if len == 32+72
-    {
-      let mclr = &buf[32..];
-
-      let typecode   = mclr[0];
-      let daemon_id = edp::be_u32(&mclr, 64);
-      let edm_seq   = edp::be_u32(&mclr, 68);
-
-      println!("{}", format!("MCLR  ip_ver: {:.1}   mc_ver: {:.1}   seq_num: {}   typecode: {}   daemon_id: {}   edm_seq: {}",
-                                    ip_ver,         mc_ver,         seq_num,      typecode,      daemon_id,      edm_seq).magenta());
-    }
-    else
-    {
-      let hdr = &buf[32..];
-
-      let typecode  = hdr[0];
-      let count     = hdr[1];
-      let version   = hdr[2];
-      let edm_seq  = edp::be_u32(&hdr, 4);
-
-      println!("{}", format!("EDP  ip_ver: {:.1}   mc_ver: {:.1}   seq_num: {}   typecode: {}   count: {}   version: {}   edm_seq: {}",
-                                   ip_ver,         mc_ver,         seq_num,      typecode,      count,      version,      edm_seq).green());
-
-      let mut rec = &hdr[8..];
-
-      for _ in 0..count
+      33 =>   //  HB
       {
-        let edp = edp::EDP::new(rec);
+        if len != 60 { println!("{}", "HB packet length is not 60".bright_red()); }
 
-        println!();
-        edp.colorprint();
+        let hb = &buf[32..];
 
-        let source   = if edp.is_digital() { "DIGITAL" } else { "ANALOG"};
+        let seconds    = edp::be_u32(&hb, 4);
+        let edm_seq    = edp::be_u32(&hb, 8);
+        let evt_seq    = edp::be_u32(&hb, 12);
+        let evt_num    = edp::be_u32(&hb, 16);
+        let hb_seq     = edp::be_u32(&hb, 20);
+        let count      = edp::be_u32(&hb, 24);
 
-        let severity = if edp.alarm()
+        println!("{}", format!("HB  ip_ver: {ip_ver:.1}   mc_ver: {mc_ver:.1}   seq_num: {seq_num}   typecode: {typecode}   seconds: {seconds}").green());
+        println!("{}", format!("    edm_seq: {edm_seq}    evt_seq: {evt_seq}    evt_num: {evt_num}   hb_seq: {hb_seq:4}   count: {count:3}").green());
+      },
+      10 | 90 =>  //  MCLR
+      {
+        if len != 104 { println!("{}", "MCLR packet length is not 104".bright_red()); }
+
+        let mclr = &buf[32..];
+
+        let daemon_id = edp::be_u32(&mclr, 64);
+        let edm_seq   = edp::be_u32(&mclr, 68);
+
+        println!("{}", format!("MCLR  ip_ver: {:.1}   mc_ver: {:.1}   seq_num: {}   typecode: {}   daemon_id: {}   edm_seq: {}",
+                                      ip_ver,         mc_ver,         seq_num,      typecode,      daemon_id,      edm_seq).magenta());
+      },
+      0 | 1 =>  //  EDP
+      {
+        let hdr = &buf[32..];
+
+        let count     = hdr[1];
+        let version   = hdr[2];
+        let edm_seq  = edp::be_u32(&hdr, 4);
+
+        println!("{}", format!("EDP  ip_ver: {:.1}   mc_ver: {:.1}   seq_num: {}   typecode: {}   count: {}   version: {}   edm_seq: {}",
+                                    ip_ver,         mc_ver,         seq_num,      typecode,      count,      version,      edm_seq).green());
+
+        let mut rec = &hdr[8..];
+
+        for _ in 0..count
         {
-          if edp.priority < 10 { "MINOR" } else { "MAJOR" }
-        }
-        else { "NO_ALARM" };
+          let edp = edp::EDP::new(rec);
 
-        let detail = if edp.bypass()
-          { "BYPASS" }
-        else
-        {
-          if edp.alarm()
+          println!();
+          edp.colorprint();
+
+          let source   = if edp.is_digital() { "DIGITAL" } else { "ANALOG"};
+
+          let severity = if edp.alarm()
           {
-            if edp.is_digital()
-            {
-               &edp.raw_data.to_string()
-            }
-            else
-            {
-              if edp.low() && ! edp.high()
-                { "LOW" }
-              else if ! edp.low() && edp.high()
-                { "HIGH" }
-              else
-                { "ANALOG" }
-            }
+            if edp.priority < 10 { "MINOR" } else { "MAJOR" }
           }
-          else { source }
-        };
+          else { "NO_ALARM" };
 
-        let alarm: Alarm =
-        [
-          ("timestamp".to_owned(),  edp.seconds.to_string()),
-          ("device".to_owned(),     edp.name.to_owned()),
-          ("source".to_owned(),     source.to_owned()),
-          ("severity".to_owned(),   severity.to_owned()),
-          ("detail".to_owned(),     detail.to_owned()),
-          ("message".to_owned(),    edp.text.to_owned()),
-        ];
+          let detail = if edp.bypass()
+            { "BYPASS" }
+          else
+          {
+            if edp.alarm()
+            {
+              if edp.is_digital()
+              {
+                &edp.raw_data.to_string()
+              }
+              else
+              {
+                if edp.low() && ! edp.high()
+                  { "LOW" }
+                else if ! edp.low() && edp.high()
+                  { "HIGH" }
+                else
+                  { "ANALOG" }
+              }
+            }
+            else { source }
+          };
 
-        match sndr.send(alarm).await
-        {
-          Ok(_) => (),
-          Err(_) => return Ok(()),
+          let alarm: Alarm =
+          [
+            ("timestamp".to_owned(),  edp.seconds.to_string()),
+            ("device".to_owned(),     edp.name.to_owned()),
+            ("source".to_owned(),     source.to_owned()),
+            ("severity".to_owned(),   severity.to_owned()),
+            ("detail".to_owned(),     detail.to_owned()),
+            ("message".to_owned(),    edp.text.to_owned()),
+          ];
+
+          match sndr.send(alarm).await
+          {
+            Ok(_) => (),
+            Err(_) => return Ok(()),
+          }
+
+          rec = &rec[192..];
         }
-
-        rec = &rec[192..];
+      },
+      76 =>
+      {
+        println!("{}", format!("Request?  ip_ver: {ip_ver:.1}   mc_ver: {mc_ver:.1}   seq_num: {seq_num}   typecode: {typecode}").magenta());
+      },
+      _ =>
+      {
+        println!("{}", format!("Unknown  ip_ver: {ip_ver:.1}   mc_ver: {mc_ver:.1}   seq_num: {seq_num}   typecode: {typecode}").bright_red());
       }
     }
   }
