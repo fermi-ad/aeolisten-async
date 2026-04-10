@@ -72,7 +72,8 @@ async fn aeolus_task(sndr: Sender<Alarm>, mcast_addr: String, listen_port: u16) 
       let daemon_id = edp::be_u32(&mclr, 64);
       let edm_seq   = edp::be_u32(&mclr, 68);
 
-      println!("{}", format!("MCLR  ip_ver: {ip_ver:.1}   mc_ver: {mc_ver:.1}   seq_num: {seq_num}   typecode: {typecode}   daemon_id: {daemon_id}   edm_seq: {edm_seq}").magenta());
+      println!("{}", format!("MCLR  ip_ver: {:.1}   mc_ver: {:.1}   seq_num: {}   typecode: {}   daemon_id: {}   edm_seq: {}",
+                                    ip_ver,         mc_ver,         seq_num,      typecode,      daemon_id,      edm_seq).magenta());
     }
     else
     {
@@ -83,7 +84,8 @@ async fn aeolus_task(sndr: Sender<Alarm>, mcast_addr: String, listen_port: u16) 
       let version   = hdr[2];
       let edm_seq  = edp::be_u32(&hdr, 4);
 
-      println!("{}", format!("EDP  ip_ver: {ip_ver:.1}   mc_ver: {mc_ver:.1}   seq_num: {seq_num}   typecode: {typecode}   count: {count}   version: {version}   edm_seq: {edm_seq}").green());
+      println!("{}", format!("EDP  ip_ver: {:.1}   mc_ver: {:.1}   seq_num: {}   typecode: {}   count: {}   version: {}   edm_seq: {}",
+                                   ip_ver,         mc_ver,         seq_num,      typecode,      count,      version,      edm_seq).green());
 
       let mut rec = &hdr[8..];
 
