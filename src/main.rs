@@ -120,12 +120,15 @@ async fn aeolus_task(sndr: Sender<Alarm>, mcast_addr: String, listen_port: u16) 
           }
           else { "NO_ALARM" };
 
-          let detail = if edp.bypass()                { "BYPASS" }
-          else if edp.alarm() && edp.is_digital()           { &edp.raw_data.to_string() }
-          else if edp.alarm() && edp.low() && ! edp.high()  { "LOW" }
-          else if edp.alarm() && edp.high() && ! edp.low()  { "HIGH" }
-          else if edp.alarm()                               { "ANALOG" }
-          else                                              { source };
+          let detail = match (edp.bypass(), edp.alarm(), edp.is_digital(), edp.high(), edp.low())
+          {
+            (true,  _,     _,     _,     _    ) => "BYPASS",
+            (false, true,  true,  _,     _    ) => &edp.raw_data.to_string(),
+            (false, true,  false, false, true ) => "LOW",
+            (false, true,  false, true,  false) => "HIGH",
+            (false, true,  false, _,     _    ) => "ANALOG",
+            (false, false, _,     _,     _    ) => source
+          };
 
           let alarm: Alarm =
           [
