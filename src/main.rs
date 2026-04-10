@@ -92,18 +92,21 @@ async fn aeolus_task(sndr: Sender<Alarm>, mcast_addr: String, listen_port: u16) 
         let edp = edp::EDP::new(rec);
 
         println!();
-        edp.println();
+        edp.colorprint();
 
         let source   = if edp.is_digital() { "DIGITAL" } else { "ANALOG"};
-        let severity = if edp.alarm() == 0 { "NO_ALARM" } else if edp.priority < 10 { "MINOR" } else { "MAJOR" };
 
-        let detail   = if edp.bypass() == 0
+        let severity = if edp.alarm()
         {
-          if edp.alarm() == 0
-          {
-            source
-          }
-          else
+          if edp.priority < 10 { "MINOR" } else { "MAJOR" }
+        }
+        else { "NO_ALARM" };
+
+        let detail = if edp.bypass()
+          { "BYPASS" }
+        else
+        {
+          if edp.alarm()
           {
             if edp.is_digital()
             {
@@ -111,13 +114,16 @@ async fn aeolus_task(sndr: Sender<Alarm>, mcast_addr: String, listen_port: u16) 
             }
             else
             {
-              if edp.low() != 0 && edp.high() == 0 { "LOW" }
-              else if edp.low() == 0 && edp.high() != 0 { "HIGH" }
-              else { "ANALOG" }
+              if edp.low() && ! edp.high()
+                { "LOW" }
+              else if ! edp.low() && edp.high()
+                { "HIGH" }
+              else
+                { "ANALOG" }
             }
           }
-        }
-        else { "BYPASS" };
+          else { source }
+        };
 
         let alarm: Alarm =
         [

@@ -1,4 +1,5 @@
 use colored::Colorize;
+use std::fmt::{Display, Formatter};
 
 pub fn be_u32(data: &[u8], idx:usize) -> u32
 {
@@ -15,10 +16,21 @@ pub fn be_i16(data: &[u8], idx:usize) -> i16
   i16::from_be_bytes(data[idx..idx+2].try_into().unwrap())
 }
 
+pub struct TF(bool);
+
+impl Display for TF
+{
+  fn fmt(&self, f: &mut Formatter) -> std::fmt::Result
+  {
+    let tf = if self.0 { "T" } else { "F" };
+    f.pad(tf)
+  }
+}
+
 pub struct EDP
 {
   pub typecode: u8,     pub priority: u8,       pub trunk: u8,        pub node: u8,       pub ssn: u8,
-  pub bs: u8,           pub erp_type: u8,       pub dig_edp: u8,      pub broken: u8,     pub unused: u8,
+  pub bs: u8,           pub erp_type: u8,       pub dig_edp: bool,    pub broken: bool,   pub unused: u8,
 
   pub status: u16,      pub handler: u16,       pub alarm_list: i16,
 
@@ -34,8 +46,8 @@ impl EDP
   {
     Self
     {
-      typecode: buf[0],   priority: buf[1],   trunk: buf[2],    node: buf[3],     ssn: buf[4],
-      bs: buf[5],         erp_type: buf[6],   dig_edp: buf[7],  broken: buf[8],   unused: buf[9],
+      typecode: buf[0], priority: buf[1],   trunk: buf[2],          node: buf[3],         ssn: buf[4],
+      bs: buf[5],       erp_type: buf[6],   dig_edp: buf[7] != 0,   broken: buf[8] != 0,  unused: buf[9],
 
       status: be_u16(buf, 10),  handler: be_u16(buf, 12), alarm_list: be_i16(buf, 14),
 
@@ -50,25 +62,29 @@ impl EDP
     }
   }
 
-  pub fn bypass(&self) -> u8    { ((self.status & 1) == 0)  as u8 }
-  pub fn alarm(&self) -> u8     { ((self.status >>  1) & 1) as u8 }
-  pub fn trigger(&self) -> u8   { ((self.status >>  2) & 1) as u8 }
-  pub fn inhibit(&self) -> u8   { ((self.status >>  3) & 1) as u8 }
-  pub fn reserved(&self) -> u8  { ((self.status >>  4) & 1) as u8 }
-  pub fn q_code(&self) -> u8    { ((self.status >>  5) & 3) as u8 }
-  pub fn dig_st(&self) -> u8    { ((self.status >>  7) & 1) as u8 }
-  pub fn k_code(&self) -> u8    { ((self.status >>  8) & 7) as u8 }
-  pub fn low(&self) -> u8       { ((self.status >> 11) & 1) as u8 }
-  pub fn high(&self) -> u8      { ((self.status >> 12) & 1) as u8 }
-  pub fn exception(&self) -> u8 { ((self.status >> 13) & 1) as u8 }
-  pub fn logging(&self) -> u8   { ((self.status >> 14) & 1) as u8 }
-  pub fn display(&self) -> u8   { ((self.status >> 15) & 1) as u8 }
+  pub fn bypass(&self)   -> bool { (self.status &  1) == 0 }   //  reverse logic
+  pub fn alarm(&self)    -> bool { (self.status &  2) != 0 }
+  pub fn trigger(&self)  -> bool { (self.status &  4) != 0 }
+  pub fn inhibit(&self)  -> bool { (self.status &  8) != 0 }
+  pub fn reserved(&self) -> bool { (self.status & 16) != 0 }
 
-  pub fn is_digital(&self) -> bool  { self.dig_edp != 0 || self.dig_st() != 0 }
+  pub fn q_code(&self) -> u8 { ((self.status >> 5) & 3) as u8 }   //  bits 32 64
+
+  pub fn dig_st(&self) -> bool { (self.status & 128) != 0 }
+
+  pub fn k_code(&self) -> u8 { ((self.status >> 8) & 7) as u8 }   //  bits 256 512 1024
+
+  pub fn low(&self)       -> bool { (self.status &  2048) != 0 }
+  pub fn high(&self)      -> bool { (self.status &  4096) != 0 }
+  pub fn exception(&self) -> bool { (self.status &  8192) != 0 }
+  pub fn logging(&self)   -> bool { (self.status & 16384) != 0 }
+  pub fn display(&self)   -> bool { (self.status & 32768) != 0 }
+
+  pub fn is_digital(&self)  -> bool { self.dig_edp || self.dig_st() }
   pub fn is_mismatch(&self) -> bool { self.dig_edp != self.dig_st() }
-  pub fn is_low_high(&self) -> bool { self.low() != 0 && self.high() != 0 }
+  pub fn is_low_high(&self) -> bool { self.low() && self.high() }
 
-  pub fn println(&self)
+  pub fn colorprint(&self)
   {
     let line1 =
     {
@@ -89,8 +105,8 @@ impl EDP
     };
     let line3 =
     {
-      let txt = format!("broken: {:5}   unused: {:5}   handler: {:3}   alarm_list: {:3}   erp_type: {:3}   dev_index: {:6}",
-                                 self.broken,   self.unused,   self.handler,   self.alarm_list,   self.erp_type,   self.dev_index);
+      let txt = format!("broken: {:>5}   unused: {:5}   handler: {:3}   alarm_list: {:3}   erp_type: {:3}   dev_index: {:6}",
+                                TF(self.broken), self.unused,  self.handler,   self.alarm_list,   self.erp_type,   self.dev_index);
       if self.is_digital() { txt.cyan() } else { txt.yellow() }
     };
     let line4a =
@@ -101,7 +117,7 @@ impl EDP
     };
     let line4b =
     {
-      let txt = format!("   dig_edp: {:4}", self.dig_edp);
+      let txt = format!("   dig_edp: {:>4}", TF(self.dig_edp));
       if self.is_mismatch() { txt.bright_red() } else if self.is_digital() { txt.cyan() } else { txt.yellow() }
     };
     let line4c =
@@ -120,23 +136,23 @@ impl EDP
     };
     let line5b =
     {
-      let txt = format!("bypass: {:2}   ", self.bypass());
-      if self.bypass() != 0 { txt.bright_blue() } else if self.is_digital() { txt.cyan() } else { txt.yellow() }
+      let txt = format!("bypass: {:>2}   ", TF(self.bypass()));
+      if self.bypass() { txt.bright_blue() } else if self.is_digital() { txt.cyan() } else { txt.yellow() }
     };
     let line5c =
     {
-      let txt = format!("alarm: {:1}   ", self.alarm());
-      if self.alarm() != 0 { txt.magenta() } else if self.is_digital() { txt.cyan() } else { txt.yellow() }
+      let txt = format!("alarm: {:1}   ", TF(self.alarm()));
+      if self.alarm() { txt.magenta() } else if self.is_digital() { txt.cyan() } else { txt.yellow() }
     };
     let line5d =
     {
-      let txt = format!("trigger: {:1}   inhibit: {:3}   reserved: {:1}   q_code: {:2}",
-                                 self.trigger(), self.inhibit(), self.reserved(), self.q_code());
+      let txt = format!("trigger: {:1}   inhibit: {:>3}   reserved: {:1}   q_code: {:2}",
+                        TF(self.trigger()), TF(self.inhibit()), TF(self.reserved()), self.q_code());
       if self.is_digital() { txt.cyan() } else { txt.yellow() }
     };
     let line6a =
     {
-      let txt = format!("dig_st: {:6}   ", self.dig_st());
+      let txt = format!("dig_st: {:>6}   ", TF(self.dig_st()));
       if self.is_mismatch() { txt.bright_red() } else if self.is_digital() { txt.cyan() } else { txt.yellow() }
     };
     let line6b =
@@ -146,20 +162,18 @@ impl EDP
     };
     let line6c =
     {
-      let txt = format!("low: {:3}   ", self.low());
-      if self.is_low_high() { txt.bright_red() } else if self.low() != 0 { txt.magenta() }
-                                                 else if self.is_digital() { txt.cyan() } else { txt.yellow() }
+      let txt = format!("low: {:>3}   ", TF(self.low()));
+      if self.is_low_high() { txt.bright_red() } else if self.low() { txt.magenta() } else if self.is_digital() { txt.cyan() } else { txt.yellow() }
     };
     let line6d =
     {
-      let txt = format!("high: {:4}   ", self.high());
-      if self.is_low_high() { txt.bright_red() } else if self.high() != 0 { txt.magenta() }
-                                                 else if self.is_digital() { txt.cyan() } else { txt.yellow() }
+      let txt = format!("high: {:>4}   ", TF(self.high()));
+      if self.is_low_high() { txt.bright_red() } else if self.high() { txt.magenta() } else if self.is_digital() { txt.cyan() } else { txt.yellow() }
     };
     let line6e =
     {
-      let txt = format!("exception: {:1}   logging: {:2}   display: {:1}",
-                                 self.exception(), self.logging(), self.display());
+      let txt = format!("exception: {:1}   logging: {:>2}   display: {:1}",
+                                 TF(self.exception()), TF(self.logging()), TF(self.display()));
       if self.is_digital() { txt.cyan() } else { txt.yellow() }
     };
 
