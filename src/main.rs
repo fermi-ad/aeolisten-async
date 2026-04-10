@@ -40,9 +40,9 @@ async fn aeolus_task(sndr: Sender<Alarm>, mcast_addr: String, listen_port: u16) 
 
     println!("{}", format!("\nReceived {len} bytes").white());
 
-    if len < 32
+    if len < 33
     {
-      println!("{}", "\nHeader too short".bright_red());
+      println!("{}", "\nPacket too small".bright_red());
       continue;
     }
 
@@ -53,7 +53,7 @@ async fn aeolus_task(sndr: Sender<Alarm>, mcast_addr: String, listen_port: u16) 
 
     match typecode
     {
-      33 =>   //  HB
+      33 =>   //  Heartbeat
       {
         if len != 60
         {
@@ -73,7 +73,7 @@ async fn aeolus_task(sndr: Sender<Alarm>, mcast_addr: String, listen_port: u16) 
         println!("{}", format!("HB  ip_ver: {ip_ver:.1}   mc_ver: {mc_ver:.1}   seq_num: {seq_num}   typecode: {typecode}   seconds: {seconds}").green());
         println!("{}", format!("    edm_seq: {edm_seq}    evt_seq: {evt_seq}    evt_num: {evt_num}   hb_seq: {hb_seq:4}   count: {count:3}").green());
       },
-      10 | 90 =>  //  MCLR
+      3 | 10 | 86 | 90 =>   //  Multiclear/Appclear
       {
         if len != 104
         {
@@ -89,7 +89,7 @@ async fn aeolus_task(sndr: Sender<Alarm>, mcast_addr: String, listen_port: u16) 
         println!("{}", format!("MCLR  ip_ver: {:.1}   mc_ver: {:.1}   seq_num: {}   typecode: {}   daemon_id: {}   edm_seq: {}",
                                       ip_ver,         mc_ver,         seq_num,      typecode,      daemon_id,      edm_seq).magenta());
       },
-      0 | 1 =>  //  EDP
+      0 | 1 | 78 =>   //  Event Display Message (has Event Display Packets)
       {
         let hdr = &buf[32..];
 
@@ -99,9 +99,9 @@ async fn aeolus_task(sndr: Sender<Alarm>, mcast_addr: String, listen_port: u16) 
 
         let count_by_len = (len - 40) / 192;
 
-        if count as usize != count_by_len { println!("{}", format!("EDP packet length can hold {count_by_len} but count is {count}").bright_red()); }
+        if count as usize != count_by_len { println!("{}", format!("EDM packet length can hold {count_by_len} but count is {count}").bright_red()); }
 
-        println!("{}", format!("EDP  ip_ver: {:.1}   mc_ver: {:.1}   seq_num: {}   typecode: {}   count: {}   version: {}   edm_seq: {}",
+        println!("{}", format!("EDM  ip_ver: {:.1}   mc_ver: {:.1}   seq_num: {}   typecode: {}   count: {}   version: {}   edm_seq: {}",
                                      ip_ver,         mc_ver,         seq_num,      typecode,      count,      version,      edm_seq).green());
 
         let mut rec = &hdr[8..];
