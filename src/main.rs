@@ -99,7 +99,7 @@ async fn aeolus_task(sndr: Sender<Alarm>, mcast_addr: String, listen_port: u16) 
 
         let count_by_len = (len - 40) / 192;
 
-        if count as usize != count_by_len { println!("{}", format!("EDM packet length can hold {count_by_len} but count is {count}").bright_red()); }
+        if count as usize != count_by_len { println!("{}", format!("EDM packet can hold {count_by_len} but count is {count}").bright_red()); }
 
         println!("{}", format!("EDM  ip_ver: {:.1}   mc_ver: {:.1}   seq_num: {}   typecode: {}   count: {}   version: {}   edm_seq: {}",
                                      ip_ver,         mc_ver,         seq_num,      typecode,      count,      version,      edm_seq).green());
@@ -167,7 +167,7 @@ async fn aeolus_task(sndr: Sender<Alarm>, mcast_addr: String, listen_port: u16) 
       },
       76 =>
       {
-        println!("{}", format!("Request?  ip_ver: {ip_ver:.1}   mc_ver: {mc_ver:.1}   seq_num: {seq_num}   typecode: {typecode}").magenta());
+        println!("{}", format!("Resend  ip_ver: {ip_ver:.1}   mc_ver: {mc_ver:.1}   seq_num: {seq_num}   typecode: {typecode}").cyan());
       },
       _ =>
       {
