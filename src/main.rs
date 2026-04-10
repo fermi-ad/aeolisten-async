@@ -3,6 +3,7 @@ use colored::Colorize;
 use redis::{AsyncCommands, Client, RedisResult, streams::StreamMaxlen};
 use redis::aio::{ConnectionManager, ConnectionManagerConfig};
 use socket2::{Domain, Protocol, Socket, Type};
+use std::cmp::min;
 use std::net::{Ipv4Addr, SocketAddrV4};
 use tokio::sync::mpsc::{Sender, Receiver};
 use tokio::net::UdpSocket;
@@ -54,7 +55,11 @@ async fn aeolus_task(sndr: Sender<Alarm>, mcast_addr: String, listen_port: u16) 
     {
       33 =>   //  HB
       {
-        if len != 60 { println!("{}", "HB packet length is not 60".bright_red()); }
+        if len != 60
+        {
+          println!("{}", "HB packet length is not 60".bright_red());
+          continue;
+        }
 
         let hb = &buf[32..];
 
@@ -70,7 +75,11 @@ async fn aeolus_task(sndr: Sender<Alarm>, mcast_addr: String, listen_port: u16) 
       },
       10 | 90 =>  //  MCLR
       {
-        if len != 104 { println!("{}", "MCLR packet length is not 104".bright_red()); }
+        if len != 104
+        {
+          println!("{}", "MCLR packet length is not 104".bright_red());
+          continue;
+        }
 
         let mclr = &buf[32..];
 
@@ -88,12 +97,18 @@ async fn aeolus_task(sndr: Sender<Alarm>, mcast_addr: String, listen_port: u16) 
         let version   = hdr[2];
         let edm_seq  = edp::be_u32(&hdr, 4);
 
+        let count_by_len = (len - 40) / 192;
+
+        if count as usize != count_by_len { println!("{}", format!("EDP packet length can hold {count_by_len} but count is {count}").bright_red()); }
+
         println!("{}", format!("EDP  ip_ver: {:.1}   mc_ver: {:.1}   seq_num: {}   typecode: {}   count: {}   version: {}   edm_seq: {}",
-                                    ip_ver,         mc_ver,         seq_num,      typecode,      count,      version,      edm_seq).green());
+                                     ip_ver,         mc_ver,         seq_num,      typecode,      count,      version,      edm_seq).green());
 
         let mut rec = &hdr[8..];
 
-        for _ in 0..count
+        let limit = min(count as usize, count_by_len);
+
+        for _ in 0..limit
         {
           let edp = edp::EDP::new(rec);
 
