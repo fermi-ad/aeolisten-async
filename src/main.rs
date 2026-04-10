@@ -3,7 +3,6 @@ use colored::Colorize;
 use redis::{AsyncCommands, Client, RedisResult, streams::StreamMaxlen};
 use redis::aio::{ConnectionManager, ConnectionManagerConfig};
 use socket2::{Domain, Protocol, Socket, Type};
-use std::cmp::min;
 use std::net::{Ipv4Addr, SocketAddrV4};
 use tokio::sync::mpsc::{Sender, Receiver};
 use tokio::net::UdpSocket;
@@ -106,9 +105,7 @@ async fn aeolus_task(sndr: Sender<Alarm>, mcast_addr: String, listen_port: u16) 
 
         let mut rec = &hdr[8..];
 
-        let limit = min(count as usize, count_by_len);
-
-        for _ in 0..limit
+        for _ in 0..std::cmp::min(count as usize, count_by_len)
         {
           let edp = edp::EDP::new(rec);
 
