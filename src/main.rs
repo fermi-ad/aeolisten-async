@@ -167,7 +167,7 @@ async fn aeolus_task(sndr: Sender<Alarm>, mcast_addr: String, listen_port: u16) 
       },
       76 =>
       {
-        println!("{}", format!("RSND  ip_ver: {ip_ver:.1}   mc_ver: {mc_ver:.1}   seq_num: {seq_num}   typecode: {typecode}").cyan());
+        println!("{}", format!("RSND  ip_ver: {ip_ver:.1}   mc_ver: {mc_ver:.1}   seq_num: {seq_num}   typecode: {typecode}").magenta());
       },
       _ =>
       {
