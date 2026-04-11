@@ -1,6 +1,7 @@
 use clap::Parser;
 use colored::Colorize;
-use redis::{AsyncCommands, Client, RedisResult, streams::StreamMaxlen};
+use redis::{AsyncCommands, Client, RedisResult};
+use redis::streams::StreamMaxlen;
 use redis::aio::{ConnectionManager, ConnectionManagerConfig};
 use socket2::{Domain, Protocol, Socket, Type};
 use std::net::{Ipv4Addr, SocketAddrV4};
@@ -13,6 +14,7 @@ type Alarm = [(String, String); 6];
 
 async fn aeolus_task(sndr: Sender<Alarm>, mcast_addr: String, listen_port: u16) -> std::io::Result<()>
 {
+  //  create listener socket for aeolus multicast
   let sock2 = Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP))?;
 
   let _ = sock2.set_reuse_address(true);
@@ -29,10 +31,11 @@ async fn aeolus_task(sndr: Sender<Alarm>, mcast_addr: String, listen_port: u16) 
 
   println!("{}", format!("\nListening on port {listen_port} to multicast from address {mcast_addr}").white());
 
-  let mut buf = [0u8; 9999];
+  let mut buf = [0u8; 9999];  //  big reusable receive buffer
 
   loop
   {
+    //  wait for a datagram to arrive
     let (len, _) = sock.recv_from(&mut buf).await?;
 
     if len == buf.len() { println!("{}", "\nMax data received".bright_red()); }
@@ -50,7 +53,7 @@ async fn aeolus_task(sndr: Sender<Alarm>, mcast_addr: String, listen_port: u16) 
     let seq_num = edp::be_u32(&buf, 24);
     let typecode: u8    = buf[32];
 
-    match typecode
+    match typecode  //  print colored output for different message types
     {
       33 =>   //  Heartbeat
       {
@@ -110,8 +113,9 @@ async fn aeolus_task(sndr: Sender<Alarm>, mcast_addr: String, listen_port: u16) 
           let edp = edp::EDP::new(rec);
 
           println!();
-          edp.colorprint();
+          edp.colorprint();   //  EDP knows how to print itself
 
+          //  build alarm entry for redis stream
           let source = if edp.is_digital() { "DIGITAL" } else { "ANALOG"};
 
           let severity = if edp.alarm()
@@ -130,7 +134,7 @@ async fn aeolus_task(sndr: Sender<Alarm>, mcast_addr: String, listen_port: u16) 
             (false, false, _,     _,     _    ) => source
           };
 
-          let alarm: Alarm =
+          let alarm: Alarm =  //  this is the redis stream entry
           [
             ("timestamp".to_owned(),  edp.seconds.to_string()),
             ("device".to_owned(),     edp.name.to_owned()),
@@ -140,13 +144,14 @@ async fn aeolus_task(sndr: Sender<Alarm>, mcast_addr: String, listen_port: u16) 
             ("message".to_owned(),    edp.text.to_owned()),
           ];
 
+          //  send it to redis task via message queue
           match sndr.send(alarm).await
           {
             Ok(_) => (),
             Err(_) => return Ok(()),
           }
 
-          rec = &rec[192..];
+          rec = &rec[192..];  //  advance to next EDP
         }
       },
       76 =>
@@ -163,6 +168,7 @@ async fn aeolus_task(sndr: Sender<Alarm>, mcast_addr: String, listen_port: u16) 
 
 async fn redis_task(mut rcvr: Receiver<Alarm>, redis_addr: String, redis_port: u16, stream_key: String) -> RedisResult<()>
 {
+  //  create a "self-healing" connection to redis
   let uri = format!("redis://{redis_addr}:{redis_port}");
 
   let client = Client::open(uri)?;
@@ -173,7 +179,7 @@ async fn redis_task(mut rcvr: Receiver<Alarm>, redis_addr: String, redis_port: u
 
   println!("{}", format!("\nUsing Redis at address {redis_addr} on port {redis_port} to stream {stream_key}").white());
 
-  loop
+  loop  //  wait for alarm messages from aeolus task and push them to redis
   {
     match rcvr.recv().await
     {
@@ -215,10 +221,13 @@ async fn main()
 {
   let args = Args::parse();
 
+  //  create a message queue for aeolus task to pass alarms to redis task
   let (sndr, rcvr) = tokio::sync::mpsc::channel::<Alarm>(1000);
 
+  //  start aeolus task with sender for message queue
   let atask = tokio::spawn(aeolus_task(sndr, args.aeolus_multicast, args.local_port));
 
+  //  start redis task with receiver for message queue
   let rtask = tokio::spawn(redis_task(rcvr, args.redis_address, args.redis_port, args.stream_key));
 
   let _ = tokio::join!(atask, rtask);
