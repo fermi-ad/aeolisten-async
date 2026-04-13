@@ -2,13 +2,13 @@ use byteorder::{BigEndian as BE, ReadBytesExt};
 use clap::Parser;
 use colored::Colorize;
 use redis::{AsyncCommands, Client, RedisResult};
-use redis::streams::StreamMaxlen;
 use redis::aio::{ConnectionManager, ConnectionManagerConfig};
+use redis::streams::StreamMaxlen;
 use socket2::{Domain, Protocol, Socket, Type};
 use std::io::Cursor;
 use std::net::{Ipv4Addr, SocketAddrV4};
-use tokio::sync::mpsc::{Sender, Receiver};
 use tokio::net::UdpSocket;
+use tokio::sync::mpsc::{Sender, Receiver};
 
 mod edp;
 

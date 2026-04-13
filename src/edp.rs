@@ -1,7 +1,7 @@
 use byteorder::{BigEndian as BE, ReadBytesExt};
 use colored::Colorize;
-use std::io::{Cursor, Read};
 use std::fmt::{Display, Formatter};
+use std::io::{Cursor, Read};
 
 //  wrapper+trait to output bool as T/F
 pub struct TF(bool);
