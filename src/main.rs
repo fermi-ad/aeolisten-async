@@ -20,6 +20,7 @@ async fn aeolus_task(sndr: Sender<Alarm>, mcast_addr: String, listen_port: u16) 
   let sock2 = Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP))?;
 
   let _ = sock2.set_reuse_address(true);
+  let _ = sock2.set_nonblocking(true);
 
   let addr = SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, listen_port);
 
@@ -113,7 +114,7 @@ async fn aeolus_task(sndr: Sender<Alarm>, mcast_addr: String, listen_port: u16) 
         println!("{}", format!("EDM  ip_ver: {:.1}   mc_ver: {:.1}   seq_num: {}   typecode: {}   count: {}   version: {}   edm_seq: {}",
                                      ip_ver,         mc_ver,         seq_num,      typecode,      count,      version,      edm_seq).green());
 
-        cur.set_position(7);  //  advance to first edp
+        cur.set_position(32+8);  //  advance to first edp
 
         for _ in 0..std::cmp::min(count as usize, count_by_len)
         {
