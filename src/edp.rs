@@ -36,7 +36,8 @@ impl EDP
 {
   pub fn new(cur: &mut Cursor<&[u8]>) -> std::io::Result<Self>
   {
-    Ok(
+    Ok
+    (
       Self
       {
         typecode: cur.read_u8()?,   priority: cur.read_u8()?,   trunk: cur.read_u8()?,      node: cur.read_u8()?,
