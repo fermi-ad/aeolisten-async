@@ -51,15 +51,14 @@ async fn aeolus_task(sndr: Sender<Alarm>, mcast_addr: String, listen_port: u16) 
       continue;
     }
 
-    let ip_ver  = buf[ 0] as f32 + buf[ 1] as f32 / 10.0;
-    let mc_ver  = buf[20] as f32 + buf[21] as f32 / 10.0;
+    let ip_ver    = buf[ 0] as f32 + buf[ 1] as f32 / 10.0;
+    let mc_ver    = buf[20] as f32 + buf[21] as f32 / 10.0;
+    let typecode  = buf[32];
 
     let mut cur = Cursor::new(&buf[..]);
 
     cur.set_position(24);
     let seq_num = cur.read_u32::<BE>()?;
-
-    let typecode= buf[32];
 
     match typecode  //  print colored output for different message types
     {
