@@ -17,8 +17,12 @@ impl Display for TF
 //  class that can decode an EDP from bytes and print it with colors
 pub struct EDP
 {
-  pub typecode: u8,     pub priority: u8,       pub trunk: u8,        pub node: u8,       pub ssn: u8,
-  pub bs: u8,           pub erp_type: u8,       pub dig_edp: bool,    pub broken: bool,   pub unused: u8,
+  pub typecode: u8,     pub priority: u8,       pub trunk: u8,        pub node: u8,
+  pub ssn: u8,          pub bs: u8,             pub erp_type: u8,
+
+  pub dig_edp: bool,    pub broken: bool,
+
+  pub unused: u8,
 
   pub status: u16,      pub handler: u16,       pub alarm_list: i16,
 
@@ -32,41 +36,43 @@ impl EDP
 {
   pub fn new(cur: &mut Cursor<&[u8]>) -> std::io::Result<Self>
   {
-    Ok(Self
-    {
-      typecode: cur.read_u8()?,   priority: cur.read_u8()?,   trunk: cur.read_u8()?,      node: cur.read_u8()?,
-      ssn: cur.read_u8()?,        bs: cur.read_u8()?,         erp_type: cur.read_u8()?,
-
-      dig_edp: cur.read_u8()? != 0,   broken: cur.read_u8()? != 0,
-
-      unused: cur.read_u8()?,
-
-      status: cur.read_u16::<BE>()?,  handler: cur.read_u16::<BE>()?,   alarm_list: cur.read_i16::<BE>()?,
-
-      dev_index: cur.read_u32::<BE>()?,   dev_class: cur.read_u32::<BE>()?,
-      dev_type: cur.read_u32::<BE>()?,    seconds: cur.read_u32::<BE>()?,
-      seq_num: cur.read_u32::<BE>()?,     sound_id: cur.read_u32::<BE>()?,
-      speech_id: cur.read_u32::<BE>()?,   raw_data: cur.read_u32::<BE>()?,
-
-      name:
+    Ok(
+      Self
       {
-        let mut buf = vec![0u8; 16];
-        cur.read_exact(&mut buf)?;
-        str::from_utf8(&buf).map_err(|e| std::io::Error::other(e))?.trim_matches('\0').trim().to_string()
-      },
-      full_name:
-      {
-        let mut buf = vec![0u8; 64];
-        cur.read_exact(&mut buf)?;
-        str::from_utf8(&buf).map_err(|e| std::io::Error::other(e))?.trim_matches('\0').trim().to_string()
-      },
-      text:
-      {
-        let mut buf = vec![0u8; 64];
-        cur.read_exact(&mut buf)?;
-        str::from_utf8(&buf).map_err(|e| std::io::Error::other(e))?.trim_matches('\0').trim().to_string()
-      },
-    })
+        typecode: cur.read_u8()?,   priority: cur.read_u8()?,   trunk: cur.read_u8()?,      node: cur.read_u8()?,
+        ssn: cur.read_u8()?,        bs: cur.read_u8()?,         erp_type: cur.read_u8()?,
+
+        dig_edp: cur.read_u8()? != 0,   broken: cur.read_u8()? != 0,
+
+        unused: cur.read_u8()?,
+
+        status: cur.read_u16::<BE>()?,  handler: cur.read_u16::<BE>()?,   alarm_list: cur.read_i16::<BE>()?,
+
+        dev_index: cur.read_u32::<BE>()?,   dev_class: cur.read_u32::<BE>()?,
+        dev_type: cur.read_u32::<BE>()?,    seconds: cur.read_u32::<BE>()?,
+        seq_num: cur.read_u32::<BE>()?,     sound_id: cur.read_u32::<BE>()?,
+        speech_id: cur.read_u32::<BE>()?,   raw_data: cur.read_u32::<BE>()?,
+
+        name:
+        {
+          let mut buf = vec![0u8; 16];
+          cur.read_exact(&mut buf)?;
+          str::from_utf8(&buf).map_err(|e| std::io::Error::other(e))?.trim_matches('\0').trim().to_string()
+        },
+        full_name:
+        {
+          let mut buf = vec![0u8; 64];
+          cur.read_exact(&mut buf)?;
+          str::from_utf8(&buf).map_err(|e| std::io::Error::other(e))?.trim_matches('\0').trim().to_string()
+        },
+        text:
+        {
+          let mut buf = vec![0u8; 64];
+          cur.read_exact(&mut buf)?;
+          str::from_utf8(&buf).map_err(|e| std::io::Error::other(e))?.trim_matches('\0').trim().to_string()
+        },
+      }
+    )
   }
 
   pub fn bypass(&self)   -> bool { (self.status & (1 << 0)) == 0 }  //  reverse logic
