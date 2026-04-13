@@ -50,7 +50,7 @@ async fn aeolus_task(sndr: Sender<Alarm>, mcast_addr: String, listen_port: u16) 
 
     let ip_ver  = buf[ 0] as f32 + buf[ 1] as f32 / 10.0;
     let mc_ver  = buf[20] as f32 + buf[21] as f32 / 10.0;
-    let seq_num = edp::be_u32(&buf, 24);
+    let seq_num = edp::be_u32(&buf[24..]);
     let typecode: u8    = buf[32];
 
     match typecode  //  print colored output for different message types
@@ -65,12 +65,12 @@ async fn aeolus_task(sndr: Sender<Alarm>, mcast_addr: String, listen_port: u16) 
 
         let hb = &buf[32..];
 
-        let seconds    = edp::be_u32(&hb, 4);
-        let edm_seq    = edp::be_u32(&hb, 8);
-        let evt_seq    = edp::be_u32(&hb, 12);
-        let evt_num    = edp::be_u32(&hb, 16);
-        let hb_seq     = edp::be_u32(&hb, 20);
-        let count      = edp::be_u32(&hb, 24);
+        let seconds    = edp::be_u32(&hb[4..]);
+        let edm_seq    = edp::be_u32(&hb[8..]);
+        let evt_seq    = edp::be_u32(&hb[12..]);
+        let evt_num    = edp::be_u32(&hb[16..]);
+        let hb_seq     = edp::be_u32(&hb[20..]);
+        let count      = edp::be_u32(&hb[24..]);
 
         println!("{}", format!("HB  ip_ver: {ip_ver:.1}   mc_ver: {mc_ver:.1}   seq_num: {seq_num}   typecode: {typecode}   seconds: {seconds}").green());
         println!("{}", format!("    edm_seq: {edm_seq}    evt_seq: {evt_seq}    evt_num: {evt_num}   hb_seq: {hb_seq:4}   count: {count:3}").green());
@@ -85,8 +85,8 @@ async fn aeolus_task(sndr: Sender<Alarm>, mcast_addr: String, listen_port: u16) 
 
         let mclr = &buf[32..];
 
-        let daemon_id = edp::be_u32(&mclr, 64);
-        let edm_seq   = edp::be_u32(&mclr, 68);
+        let daemon_id = edp::be_u32(&mclr[64..]);
+        let edm_seq   = edp::be_u32(&mclr[68..]);
 
         println!("{}", format!("MCLR  ip_ver: {:.1}   mc_ver: {:.1}   seq_num: {}   typecode: {}   daemon_id: {}   edm_seq: {}",
                                       ip_ver,         mc_ver,         seq_num,      typecode,      daemon_id,      edm_seq).magenta());
@@ -97,7 +97,7 @@ async fn aeolus_task(sndr: Sender<Alarm>, mcast_addr: String, listen_port: u16) 
 
         let count     = hdr[1];
         let version   = hdr[2];
-        let edm_seq  = edp::be_u32(&hdr, 4);
+        let edm_seq  = edp::be_u32(&hdr[4..]);
 
         let count_by_len = (len - 40) / 192;
 

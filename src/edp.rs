@@ -1,19 +1,19 @@
 use colored::Colorize;
 use std::fmt::{Display, Formatter};
 
-pub fn be_u32(data: &[u8], idx:usize) -> u32
+pub fn be_u32(data: &[u8]) -> u32
 {
-  u32::from_be_bytes(data[idx..idx+4].try_into().unwrap())
+  u32::from_be_bytes(data[..4].try_into().unwrap())
 }
 
-pub fn be_u16(data: &[u8], idx:usize) -> u16
+pub fn be_u16(data: &[u8]) -> u16
 {
-  u16::from_be_bytes(data[idx..idx+2].try_into().unwrap())
+  u16::from_be_bytes(data[..2].try_into().unwrap())
 }
 
-pub fn be_i16(data: &[u8], idx:usize) -> i16
+pub fn be_i16(data: &[u8]) -> i16
 {
-  i16::from_be_bytes(data[idx..idx+2].try_into().unwrap())
+  i16::from_be_bytes(data[..2].try_into().unwrap())
 }
 
 pub struct TF(bool);
@@ -22,8 +22,7 @@ impl Display for TF
 {
   fn fmt(&self, f: &mut Formatter) -> std::fmt::Result
   {
-    let tf = if self.0 { "T" } else { "F" };
-    f.pad(tf)
+    f.pad(if self.0 { "T" } else { "F" })
   }
 }
 
@@ -49,12 +48,12 @@ impl EDP
       typecode: buf[0],   priority: buf[1],   trunk: buf[2],          node: buf[3],           ssn: buf[4],
       bs: buf[5],         erp_type: buf[6],   dig_edp: buf[7] != 0,   broken: buf[8] != 0,    unused: buf[9],
 
-      status: be_u16(buf, 10),  handler: be_u16(buf, 12), alarm_list: be_i16(buf, 14),
+      status: be_u16(&buf[10..]),  handler: be_u16(&buf[12..]),   alarm_list: be_i16(&buf[14..]),
 
-      dev_index: be_u32(buf, 16),   dev_class: be_u32(buf, 20),
-      dev_type: be_u32(buf, 24),    seconds: be_u32(buf, 28),
-      seq_num: be_u32(buf, 32),     sound_id: be_u32(buf, 36),
-      speech_id: be_u32(buf, 40),   raw_data: be_u32(buf, 44),
+      dev_index: be_u32(&buf[16..]),   dev_class: be_u32(&buf[20..]),
+      dev_type: be_u32(&buf[24..]),    seconds: be_u32(&buf[28..]),
+      seq_num: be_u32(&buf[32..]),     sound_id: be_u32(&buf[36..]),
+      speech_id: be_u32(&buf[40..]),   raw_data: be_u32(&buf[44..]),
 
       name: str::from_utf8(&buf[48..64]).unwrap().trim_end_matches('\0').trim_end().to_string(),
       full_name: str::from_utf8(&buf[64..128]).unwrap().trim_end_matches('\0').trim_end().to_string(),
