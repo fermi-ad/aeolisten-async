@@ -19,8 +19,8 @@ async fn aeolus_task(sndr: Sender<Alarm>, mcast_addr: String, listen_port: u16) 
   //  create listener socket for aeolus multicast
   let sock2 = Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP))?;
 
-  let _ = sock2.set_reuse_address(true);
-  let _ = sock2.set_nonblocking(true);
+  let _ = sock2.set_nonblocking(true);          //  socket should be nonblocking for tokio
+  let _ = sock2.set_reuse_address(true);  //  and reusable address for multicast
 
   let addr = SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, listen_port);
 
@@ -83,7 +83,7 @@ async fn aeolus_task(sndr: Sender<Alarm>, mcast_addr: String, listen_port: u16) 
         println!("{}", format!("HB  ip_ver: {ip_ver:.1}   mc_ver: {mc_ver:.1}   seq_num: {seq_num}   typecode: {typecode}   seconds: {seconds}").green());
         println!("{}", format!("    edm_seq: {edm_seq}    evt_seq: {evt_seq}    evt_num: {evt_num}   hb_seq: {hb_seq:4}   count: {count:3}").green());
       },
-      3 | 10 | 86 | 90 =>   //  Multiclear/Appclear
+      3 | 10 | 86 | 87 | 90 =>   //  Multiclear/Appclear
       {
         if len != 104
         {
