@@ -178,12 +178,24 @@ impl EDP
     let line6c =
     {
       let txt = format!("low: {:>3}   ", TF(self.low()));
-      if self.is_low_high() { txt.bright_red() } else if self.low() { txt.magenta() } else if self.is_digital() { txt.cyan() } else { txt.yellow() }
+      match (self.is_low_high(), self.low(), self.is_digital())
+      {
+        (true, _, _) => txt.bright_red(),
+        (false, true, _) => txt.magenta(),
+        (false, false, true) => txt.cyan(),
+        (false, false, false) => txt.yellow(),
+      }
     };
     let line6d =
     {
       let txt = format!("high: {:>4}   ", TF(self.high()));
-      if self.is_low_high() { txt.bright_red() } else if self.high() { txt.magenta() } else if self.is_digital() { txt.cyan() } else { txt.yellow() }
+      match (self.is_low_high(), self.high(), self.is_digital())
+      {
+        (true, _, _) => txt.bright_red(),
+        (false, true, _) => txt.magenta(),
+        (false, false, true) => txt.cyan(),
+        (false, false, false) => txt.yellow(),
+      }
     };
     let line6e =
     {
