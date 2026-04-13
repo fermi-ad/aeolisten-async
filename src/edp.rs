@@ -1,21 +1,9 @@
+use byteorder::{BigEndian as BE, ReadBytesExt};
 use colored::Colorize;
+use std::io::{Cursor, Read};
 use std::fmt::{Display, Formatter};
 
-pub fn be_u32(data: &[u8]) -> u32
-{
-  u32::from_be_bytes(data[..4].try_into().unwrap())
-}
-
-pub fn be_u16(data: &[u8]) -> u16
-{
-  u16::from_be_bytes(data[..2].try_into().unwrap())
-}
-
-pub fn be_i16(data: &[u8]) -> i16
-{
-  i16::from_be_bytes(data[..2].try_into().unwrap())
-}
-
+//  wrapper+trait to output bool as T/F
 pub struct TF(bool);
 
 impl Display for TF
@@ -26,6 +14,7 @@ impl Display for TF
   }
 }
 
+//  class that can decode an EDP from bytes and print it with colors
 pub struct EDP
 {
   pub typecode: u8,     pub priority: u8,       pub trunk: u8,        pub node: u8,       pub ssn: u8,
@@ -41,24 +30,43 @@ pub struct EDP
 
 impl EDP
 {
-  pub fn new(buf: &[u8]) -> Self
+  pub fn new(cur: &mut Cursor<&[u8]>) -> std::io::Result<Self>
   {
-    Self
+    Ok(Self
     {
-      typecode: buf[0],   priority: buf[1],   trunk: buf[2],          node: buf[3],           ssn: buf[4],
-      bs: buf[5],         erp_type: buf[6],   dig_edp: buf[7] != 0,   broken: buf[8] != 0,    unused: buf[9],
+      typecode: cur.read_u8()?,   priority: cur.read_u8()?,   trunk: cur.read_u8()?,      node: cur.read_u8()?,
+      ssn: cur.read_u8()?,        bs: cur.read_u8()?,         erp_type: cur.read_u8()?,
 
-      status: be_u16(&buf[10..]),  handler: be_u16(&buf[12..]),   alarm_list: be_i16(&buf[14..]),
+      dig_edp: cur.read_u8()? != 0,   broken: cur.read_u8()? != 0,
 
-      dev_index: be_u32(&buf[16..]),   dev_class: be_u32(&buf[20..]),
-      dev_type: be_u32(&buf[24..]),    seconds: be_u32(&buf[28..]),
-      seq_num: be_u32(&buf[32..]),     sound_id: be_u32(&buf[36..]),
-      speech_id: be_u32(&buf[40..]),   raw_data: be_u32(&buf[44..]),
+      unused: cur.read_u8()?,
 
-      name: str::from_utf8(&buf[48..64]).unwrap().trim_end_matches('\0').trim_end().to_string(),
-      full_name: str::from_utf8(&buf[64..128]).unwrap().trim_end_matches('\0').trim_end().to_string(),
-      text: str::from_utf8(&buf[128..192]).unwrap().trim_end_matches('\0').trim_end().to_string(),
-    }
+      status: cur.read_u16::<BE>()?,  handler: cur.read_u16::<BE>()?,   alarm_list: cur.read_i16::<BE>()?,
+
+      dev_index: cur.read_u32::<BE>()?,   dev_class: cur.read_u32::<BE>()?,
+      dev_type: cur.read_u32::<BE>()?,    seconds: cur.read_u32::<BE>()?,
+      seq_num: cur.read_u32::<BE>()?,     sound_id: cur.read_u32::<BE>()?,
+      speech_id: cur.read_u32::<BE>()?,   raw_data: cur.read_u32::<BE>()?,
+
+      name:
+      {
+        let mut buf = vec![0u8; 16];
+        cur.read_exact(&mut buf)?;
+        str::from_utf8(&buf).map_err(|e| std::io::Error::other(e))?.trim_matches('\0').trim().to_string()
+      },
+      full_name:
+      {
+        let mut buf = vec![0u8; 64];
+        cur.read_exact(&mut buf)?;
+        str::from_utf8(&buf).map_err(|e| std::io::Error::other(e))?.trim_matches('\0').trim().to_string()
+      },
+      text:
+      {
+        let mut buf = vec![0u8; 64];
+        cur.read_exact(&mut buf)?;
+        str::from_utf8(&buf).map_err(|e| std::io::Error::other(e))?.trim_matches('\0').trim().to_string()
+      },
+    })
   }
 
   pub fn bypass(&self)   -> bool { (self.status & (1 << 0)) == 0 }  //  reverse logic
@@ -79,9 +87,9 @@ impl EDP
   pub fn logging(&self)   -> bool { (self.status & (1 << 14)) != 0 }
   pub fn display(&self)   -> bool { (self.status & (1 << 15)) != 0 }
 
-  pub fn is_digital(&self)  -> bool { self.dig_edp || self.dig_st() }
-  pub fn is_mismatch(&self) -> bool { self.dig_edp != self.dig_st() }
-  pub fn is_low_high(&self) -> bool { self.low() && self.high() }
+  pub fn is_digital(&self)  -> bool { self.dig_edp || self.dig_st() }   //  does either bit claim digital
+  pub fn is_mismatch(&self) -> bool { self.dig_edp != self.dig_st() }   //  do both digital bits agree
+  pub fn is_low_high(&self) -> bool { self.low() && self.high() }       //  are both low and high set
 
   pub fn colorprint(&self)
   {

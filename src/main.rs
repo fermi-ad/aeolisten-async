@@ -1,9 +1,11 @@
+use byteorder::{BigEndian as BE, ByteOrder, ReadBytesExt};
 use clap::Parser;
 use colored::Colorize;
 use redis::{AsyncCommands, Client, RedisResult};
 use redis::streams::StreamMaxlen;
 use redis::aio::{ConnectionManager, ConnectionManagerConfig};
 use socket2::{Domain, Protocol, Socket, Type};
+use std::io::Cursor;
 use std::net::{Ipv4Addr, SocketAddrV4};
 use tokio::sync::mpsc::{Sender, Receiver};
 use tokio::net::UdpSocket;
@@ -50,7 +52,7 @@ async fn aeolus_task(sndr: Sender<Alarm>, mcast_addr: String, listen_port: u16) 
 
     let ip_ver  = buf[ 0] as f32 + buf[ 1] as f32 / 10.0;
     let mc_ver  = buf[20] as f32 + buf[21] as f32 / 10.0;
-    let seq_num = edp::be_u32(&buf[24..]);
+    let seq_num = BE::read_u32(&buf[24..]);   //  can panic TODO: produce error instead
     let typecode: u8    = buf[32];
 
     match typecode  //  print colored output for different message types
@@ -63,14 +65,14 @@ async fn aeolus_task(sndr: Sender<Alarm>, mcast_addr: String, listen_port: u16) 
           continue;
         }
 
-        let hb = &buf[32..];
+        let mut cur = Cursor::new(&buf[(32+4)..]);
 
-        let seconds    = edp::be_u32(&hb[4..]);
-        let edm_seq    = edp::be_u32(&hb[8..]);
-        let evt_seq    = edp::be_u32(&hb[12..]);
-        let evt_num    = edp::be_u32(&hb[16..]);
-        let hb_seq     = edp::be_u32(&hb[20..]);
-        let count      = edp::be_u32(&hb[24..]);
+        let seconds    = cur.read_u32::<BE>()?;
+        let edm_seq    = cur.read_u32::<BE>()?;
+        let evt_seq    = cur.read_u32::<BE>()?;
+        let evt_num    = cur.read_u32::<BE>()?;
+        let hb_seq     = cur.read_u32::<BE>()?;
+        let count      = cur.read_u32::<BE>()?;
 
         println!("{}", format!("HB  ip_ver: {ip_ver:.1}   mc_ver: {mc_ver:.1}   seq_num: {seq_num}   typecode: {typecode}   seconds: {seconds}").green());
         println!("{}", format!("    edm_seq: {edm_seq}    evt_seq: {evt_seq}    evt_num: {evt_num}   hb_seq: {hb_seq:4}   count: {count:3}").green());
@@ -83,21 +85,21 @@ async fn aeolus_task(sndr: Sender<Alarm>, mcast_addr: String, listen_port: u16) 
           continue;
         }
 
-        let mclr = &buf[32..];
+        let mut cur = Cursor::new(&buf[(32+64)..]);
 
-        let daemon_id = edp::be_u32(&mclr[64..]);
-        let edm_seq   = edp::be_u32(&mclr[68..]);
+        let daemon_id = cur.read_u32::<BE>()?;
+        let edm_seq   = cur.read_u32::<BE>()?;
 
         println!("{}", format!("MCLR  ip_ver: {:.1}   mc_ver: {:.1}   seq_num: {}   typecode: {}   daemon_id: {}   edm_seq: {}",
                                       ip_ver,         mc_ver,         seq_num,      typecode,      daemon_id,      edm_seq).magenta());
       },
       0 | 1 | 78 =>   //  Event Display Message (has Event Display Packets)
       {
-        let hdr = &buf[32..];
+        let mut cur = Cursor::new(&buf[(32+1)..]);
 
-        let count     = hdr[1];
-        let version   = hdr[2];
-        let edm_seq  = edp::be_u32(&hdr[4..]);
+        let count     = cur.read_u8()?;
+        let version   = cur.read_u8()?;
+        let edm_seq  = cur.read_u32::<BE>()?;
 
         let count_by_len = (len - 40) / 192;
 
@@ -106,11 +108,11 @@ async fn aeolus_task(sndr: Sender<Alarm>, mcast_addr: String, listen_port: u16) 
         println!("{}", format!("EDM  ip_ver: {:.1}   mc_ver: {:.1}   seq_num: {}   typecode: {}   count: {}   version: {}   edm_seq: {}",
                                      ip_ver,         mc_ver,         seq_num,      typecode,      count,      version,      edm_seq).green());
 
-        let mut rec = &hdr[8..];
+        cur.set_position(7);  //  advance to first edp
 
         for _ in 0..std::cmp::min(count as usize, count_by_len)
         {
-          let edp = edp::EDP::new(rec);
+          let edp = edp::EDP::new(&mut cur)?;
 
           println!();
           edp.colorprint();   //  EDP knows how to print itself
@@ -150,8 +152,6 @@ async fn aeolus_task(sndr: Sender<Alarm>, mcast_addr: String, listen_port: u16) 
             Ok(_) => (),
             Err(_) => return Ok(()),
           }
-
-          rec = &rec[192..];  //  advance to next EDP
         }
       },
       76 =>
