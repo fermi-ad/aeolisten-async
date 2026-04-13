@@ -1,20 +1,20 @@
 use byteorder::{BigEndian as BE, ReadBytesExt};
 use clap::Parser;
 use colored::Colorize;
-use redis::{AsyncCommands, Client, RedisResult};
+use redis::{AsyncCommands, Client};
 use redis::aio::{ConnectionManager, ConnectionManagerConfig};
 use redis::streams::StreamMaxlen;
 use socket2::{Domain, Protocol, Socket, Type};
+use std::error::Error;
 use std::io::Cursor;
 use std::net::{Ipv4Addr, SocketAddrV4};
 use tokio::net::UdpSocket;
 use tokio::sync::mpsc::{Sender, Receiver};
-
 mod edp;
 
 type Alarm = [(String, String); 6];
 
-async fn aeolus_task(sndr: Sender<Alarm>, mcast_addr: String, listen_port: u16) -> std::io::Result<()>
+async fn aeolus_task(sndr: Sender<Alarm>, mcast_addr: String, listen_port: u16) -> Result<(), Box<dyn Error>>
 {
   //  create listener socket for aeolus multicast
   let sock2 = Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP))?;
@@ -26,7 +26,7 @@ async fn aeolus_task(sndr: Sender<Alarm>, mcast_addr: String, listen_port: u16) 
 
   let _ = sock2.bind(&addr.into());
 
-  let group: Ipv4Addr = mcast_addr.parse().map_err(|e| std::io::Error::other(e))?;
+  let group: Ipv4Addr = mcast_addr.parse()?;
 
   let _ = sock2.join_multicast_v4(&group, &Ipv4Addr::UNSPECIFIED);
 
@@ -171,7 +171,7 @@ async fn aeolus_task(sndr: Sender<Alarm>, mcast_addr: String, listen_port: u16) 
   }
 }
 
-async fn redis_task(mut rcvr: Receiver<Alarm>, redis_addr: String, redis_port: u16, stream_key: String) -> RedisResult<()>
+async fn redis_task(mut rcvr: Receiver<Alarm>, redis_addr: String, redis_port: u16, stream_key: String) -> Result<(), Box<dyn Error>>
 {
   //  create a "self-healing" connection to redis
   let uri = format!("redis://{redis_addr}:{redis_port}");
@@ -222,7 +222,7 @@ struct Args
 }
 
 #[tokio::main]
-async fn main()
+async fn main() -> Result<(), Box<dyn Error>>
 {
   let args = Args::parse();
 
@@ -230,10 +230,15 @@ async fn main()
   let (sndr, rcvr) = tokio::sync::mpsc::channel::<Alarm>(1000);
 
   //  start aeolus task with sender for message queue
-  let atask = tokio::spawn(aeolus_task(sndr, args.aeolus_multicast, args.local_port));
-
   //  start redis task with receiver for message queue
-  let rtask = tokio::spawn(redis_task(rcvr, args.redis_address, args.redis_port, args.stream_key));
+  let (ajoin, rjoin) = tokio::join!
+  (
+    aeolus_task(sndr, args.aeolus_multicast, args.local_port),
+    redis_task(rcvr, args.redis_address, args.redis_port, args.stream_key)
+  );
 
-  let _ = tokio::join!(atask, rtask);
+  //  report any error on exit (never happens, we Ctrl-C out of this program)
+  let (_, _) = (ajoin?, rjoin?);
+
+  Ok(())
 }

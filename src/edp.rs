@@ -1,5 +1,6 @@
 use byteorder::{BigEndian as BE, ReadBytesExt};
 use colored::Colorize;
+use std::error::Error;
 use std::fmt::{Display, Formatter};
 use std::io::{Cursor, Read};
 
@@ -34,7 +35,7 @@ pub struct EDP
 
 impl EDP
 {
-  pub fn new(cur: &mut Cursor<&[u8]>) -> std::io::Result<Self>
+  pub fn new(cur: &mut Cursor<&[u8]>) -> Result<Self, Box<dyn Error>>
   {
     Ok
     (
@@ -58,19 +59,19 @@ impl EDP
         {
           let mut buf = vec![0u8; 16];
           cur.read_exact(&mut buf)?;
-          str::from_utf8(&buf).map_err(|e| std::io::Error::other(e))?.trim_matches('\0').trim().to_string()
+          str::from_utf8(&buf)?.trim_matches('\0').trim().to_string()
         },
         full_name:
         {
           let mut buf = vec![0u8; 64];
           cur.read_exact(&mut buf)?;
-          str::from_utf8(&buf).map_err(|e| std::io::Error::other(e))?.trim_matches('\0').trim().to_string()
+          str::from_utf8(&buf)?.trim_matches('\0').trim().to_string()
         },
         text:
         {
           let mut buf = vec![0u8; 64];
           cur.read_exact(&mut buf)?;
-          str::from_utf8(&buf).map_err(|e| std::io::Error::other(e))?.trim_matches('\0').trim().to_string()
+          str::from_utf8(&buf)?.trim_matches('\0').trim().to_string()
         },
       }
     )
