@@ -1,4 +1,4 @@
-use byteorder::{BigEndian as BE, ByteOrder, ReadBytesExt};
+use byteorder::{BigEndian as BE, ReadBytesExt};
 use clap::Parser;
 use colored::Colorize;
 use redis::{AsyncCommands, Client, RedisResult};
@@ -52,8 +52,13 @@ async fn aeolus_task(sndr: Sender<Alarm>, mcast_addr: String, listen_port: u16) 
 
     let ip_ver  = buf[ 0] as f32 + buf[ 1] as f32 / 10.0;
     let mc_ver  = buf[20] as f32 + buf[21] as f32 / 10.0;
-    let seq_num = BE::read_u32(&buf[24..]);   //  can panic TODO: produce error instead
-    let typecode: u8    = buf[32];
+
+    let mut cur = Cursor::new(&buf[..]);
+
+    cur.set_position(24);
+    let seq_num = cur.read_u32::<BE>()?;
+
+    let typecode= buf[32];
 
     match typecode  //  print colored output for different message types
     {
@@ -65,7 +70,7 @@ async fn aeolus_task(sndr: Sender<Alarm>, mcast_addr: String, listen_port: u16) 
           continue;
         }
 
-        let mut cur = Cursor::new(&buf[(32+4)..]);
+        cur.set_position(32+4);
 
         let seconds    = cur.read_u32::<BE>()?;
         let edm_seq    = cur.read_u32::<BE>()?;
@@ -85,7 +90,7 @@ async fn aeolus_task(sndr: Sender<Alarm>, mcast_addr: String, listen_port: u16) 
           continue;
         }
 
-        let mut cur = Cursor::new(&buf[(32+64)..]);
+        cur.set_position(32+64);
 
         let daemon_id = cur.read_u32::<BE>()?;
         let edm_seq   = cur.read_u32::<BE>()?;
@@ -95,7 +100,7 @@ async fn aeolus_task(sndr: Sender<Alarm>, mcast_addr: String, listen_port: u16) 
       },
       0 | 1 | 78 =>   //  Event Display Message (has Event Display Packets)
       {
-        let mut cur = Cursor::new(&buf[(32+1)..]);
+        cur.set_position(32+1);
 
         let count     = cur.read_u8()?;
         let version   = cur.read_u8()?;
