@@ -19,7 +19,7 @@ async fn aeolus_task(sndr: Sender<Alarm>, mcast_addr: String, listen_port: u16) 
   //  create listener socket for aeolus multicast
   let sock2 = Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP))?;
 
-  let _ = sock2.set_nonblocking(true);          //  socket should be nonblocking for tokio
+  let _ = sock2.set_nonblocking(true);    //  socket should be nonblocking for tokio
   let _ = sock2.set_reuse_address(true);  //  and reusable address for multicast
 
   let addr = SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, listen_port);
