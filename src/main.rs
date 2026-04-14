@@ -1,5 +1,4 @@
-mod edp;
-mod aeolus;
+mod aeolus; mod edp;
 
 use crate::aeolus::{aeolus_task, Alarm};
 
@@ -9,7 +8,8 @@ use redis::{AsyncCommands, Client};
 use redis::aio::{ConnectionManager, ConnectionManagerConfig};
 use redis::streams::StreamMaxlen;
 use std::error::Error;
-use tokio::sync::mpsc::{channel, Receiver};
+use tokio::sync::mpsc as mpsc;
+use tokio::sync::mpsc::Receiver;
 
 async fn redis_task(mut rcvr: Receiver<Alarm>, redis_addr: String, redis_port: u16, stream_key: String) -> Result<(), Box<dyn Error>>
 {
@@ -67,7 +67,7 @@ async fn main() -> Result<(), Box<dyn Error>>
   let args = Args::parse();
 
   //  create a message queue for aeolus task to pass alarms to redis task
-  let (sndr, rcvr) = channel::<Alarm>(1000);
+  let (sndr, rcvr) = mpsc::channel::<Alarm>(1000);
 
   //  start aeolus task with sender for message queue
   //  start redis task with receiver for message queue
