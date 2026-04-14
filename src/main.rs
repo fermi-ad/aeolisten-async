@@ -1,3 +1,8 @@
+mod edp;
+mod aeolus;
+
+use crate::aeolus::{aeolus_task, Alarm};
+
 use clap::Parser;
 use colored::Colorize;
 use redis::{AsyncCommands, Client};
@@ -5,10 +10,6 @@ use redis::aio::{ConnectionManager, ConnectionManagerConfig};
 use redis::streams::StreamMaxlen;
 use std::error::Error;
 use tokio::sync::mpsc::{channel, Receiver};
-
-mod edp;
-mod aeolus;
-use crate::aeolus::{aeolus_task, Alarm};
 
 async fn redis_task(mut rcvr: Receiver<Alarm>, redis_addr: String, redis_port: u16, stream_key: String) -> Result<(), Box<dyn Error>>
 {

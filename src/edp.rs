@@ -5,7 +5,7 @@ use std::fmt::{Display, Formatter};
 use std::io::{Cursor, Read};
 
 //  wrapper+trait to output bool as T/F
-pub struct TF(bool);
+struct TF(bool);
 
 impl Display for TF
 {

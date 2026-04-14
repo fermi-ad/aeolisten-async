@@ -1,3 +1,5 @@
+use crate::edp::EDP;
+
 use byteorder::{BigEndian as BE, ReadBytesExt};
 use colored::Colorize;
 use socket2::{Domain, Protocol, Socket, Type};
@@ -7,8 +9,6 @@ use std::net::{Ipv4Addr, SocketAddrV4};
 use tokio::net::UdpSocket;
 use tokio::sync::mpsc::Sender;
 
-use crate::edp::EDP;
-
 pub type Alarm = [(String, String); 6];
 
 pub async fn aeolus_task(sndr: Sender<Alarm>, mcast_addr: String, listen_port: u16) -> Result<(), Box<dyn Error>>
@@ -17,7 +17,7 @@ pub async fn aeolus_task(sndr: Sender<Alarm>, mcast_addr: String, listen_port: u
   let sock2 = Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP))?;
 
   let _ = sock2.set_nonblocking(true);    //  socket should be nonblocking for tokio
-  let _ = sock2.set_reuse_address(true);  //  and reusable address for multicast
+  let _ = sock2.set_reuse_address(true);  //  and reuse address for multicast
 
   let addr = SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, listen_port);
 
