@@ -11,8 +11,7 @@ use tokio::sync::mpsc::Sender;
 
 pub type Alarm = [(String, String); 6];
 
-pub async fn aeolus_task(sndr: Sender<Alarm>, mcast_addr: String, listen_port: u16) -> Result<(), Box<dyn Error>>
-{
+pub async fn aeolus_task(sndr: Sender<Alarm>, mcast_addr: String, listen_port: u16) -> Result<(), Box<dyn Error>> {
   //  create listener socket for aeolus multicast
   let sock2 = Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP))?;
 
@@ -33,8 +32,7 @@ pub async fn aeolus_task(sndr: Sender<Alarm>, mcast_addr: String, listen_port: u
 
   let mut buf = [0u8; 9999];  //  big reusable receive buffer
 
-  loop
-  {
+  loop {
     //  wait for a datagram to arrive
     let (len, _) = sock.recv_from(&mut buf).await?;
 
@@ -42,12 +40,10 @@ pub async fn aeolus_task(sndr: Sender<Alarm>, mcast_addr: String, listen_port: u
 
     println!("{}", format!("\nReceived {len} bytes").white());
 
-    if len < 33
-    {
+    if len < 33 {
       println!("{}", "\nPacket too small".bright_red());
       continue;
     }
-
     let ip_ver    = buf[ 0] as f32 + buf[ 1] as f32 / 10.0;
     let mc_ver    = buf[20] as f32 + buf[21] as f32 / 10.0;
     let typecode  = buf[32];
@@ -57,16 +53,12 @@ pub async fn aeolus_task(sndr: Sender<Alarm>, mcast_addr: String, listen_port: u
     cur.set_position(24);
     let seq_num = cur.read_u32::<BE>()?;
 
-    match typecode  //  print colored output for different message types
-    {
-      33 =>   //  Heartbeat
-      {
-        if len != 60
-        {
+    match typecode {  //  print colored output for different message types
+      33 => {   //  Heartbeat
+        if len != 60 {
           println!("{}", "HB packet length is not 60".bright_red());
           continue;
         }
-
         cur.set_position(32+4);
 
         let seconds    = cur.read_u32::<BE>()?;
@@ -79,14 +71,11 @@ pub async fn aeolus_task(sndr: Sender<Alarm>, mcast_addr: String, listen_port: u
         println!("{}", format!("HB  ip_ver: {ip_ver:.1}   mc_ver: {mc_ver:.1}   seq_num: {seq_num}   typecode: {typecode}   seconds: {seconds}").green());
         println!("{}", format!("    edm_seq: {edm_seq}    evt_seq: {evt_seq}    evt_num: {evt_num}   hb_seq: {hb_seq:4}   count: {count:3}").green());
       },
-      3 | 10 | 86 | 87 | 90 =>   //  Multiclear/Appclear
-      {
-        if len != 104
-        {
+      3 | 10 | 86 | 87 | 90 => {   //  Multiclear/Appclear
+        if len != 104 {
           println!("{}", "MCLR packet length is not 104".bright_red());
           continue;
         }
-
         cur.set_position(32+64);
 
         let daemon_id = cur.read_u32::<BE>()?;
@@ -95,8 +84,7 @@ pub async fn aeolus_task(sndr: Sender<Alarm>, mcast_addr: String, listen_port: u
         println!("{}", format!("MCLR  ip_ver: {:.1}   mc_ver: {:.1}   seq_num: {}   typecode: {}   daemon_id: {}   edm_seq: {}",
                                       ip_ver,         mc_ver,         seq_num,      typecode,      daemon_id,      edm_seq).magenta());
       },
-      0 | 1 | 78 =>   //  Event Display Message (has Event Display Packets)
-      {
+      0 | 1 | 78 => {   //  Event Display Message (has Event Display Packets)
         cur.set_position(32+1);
 
         let count     = cur.read_u8()?;
@@ -112,8 +100,7 @@ pub async fn aeolus_task(sndr: Sender<Alarm>, mcast_addr: String, listen_port: u
 
         cur.set_position(32+8);  //  advance to first edp
 
-        for _ in 0..std::cmp::min(count as usize, count_by_len)
-        {
+        for _ in 0..std::cmp::min(count as usize, count_by_len) {
           let edp = EDP::new(&mut cur)?;
 
           println!();
@@ -122,14 +109,12 @@ pub async fn aeolus_task(sndr: Sender<Alarm>, mcast_addr: String, listen_port: u
           //  build alarm entry for redis stream
           let source = if edp.is_digital() { "DIGITAL" } else { "ANALOG"};
 
-          let severity = if edp.alarm()
-          {
+          let severity = if edp.alarm() {
             if edp.priority < 10 { "MINOR" } else { "MAJOR" }
           }
           else { "NO_ALARM" };
 
-          let detail = match (edp.bypass(), edp.alarm(), edp.is_digital(), edp.high(), edp.low())
-          {
+          let detail = match (edp.bypass(), edp.alarm(), edp.is_digital(), edp.high(), edp.low()) {
             (true,  _,     _,     _,     _    ) => "BYPASS",
             (false, true,  true,  _,     _    ) => &edp.raw_data.to_string(),
             (false, true,  false, false, true ) => "LOW",
@@ -138,8 +123,7 @@ pub async fn aeolus_task(sndr: Sender<Alarm>, mcast_addr: String, listen_port: u
             (false, false, _,     _,     _    ) => source
           };
 
-          let alarm: Alarm =  //  this is the redis stream entry
-          [
+          let alarm: Alarm = [  //  this is the redis stream entry
             ("timestamp".to_owned(),  edp.seconds.to_string()),
             ("device".to_owned(),     edp.name.to_owned()),
             ("source".to_owned(),     source.to_owned()),
@@ -147,21 +131,14 @@ pub async fn aeolus_task(sndr: Sender<Alarm>, mcast_addr: String, listen_port: u
             ("detail".to_owned(),     detail.to_owned()),
             ("message".to_owned(),    edp.text.to_owned()),
           ];
-
           //  send it to redis task via message queue
-          match sndr.send(alarm).await
-          {
-            Ok(_) => (),
-            Err(_) => return Ok(()),
-          }
+          let _ = sndr.send(alarm).await;
         }
       },
-      76 =>
-      {
+      76 => {
         println!("{}", format!("RSND  ip_ver: {ip_ver:.1}   mc_ver: {mc_ver:.1}   seq_num: {seq_num}   typecode: {typecode}").magenta());
       },
-      _ =>
-      {
+      _ => {
         println!("{}", format!("UNK  ip_ver: {ip_ver:.1}   mc_ver: {mc_ver:.1}   seq_num: {seq_num}   typecode: {typecode}").bright_red());
       }
     }
