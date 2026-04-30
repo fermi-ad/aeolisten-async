@@ -125,7 +125,7 @@ impl EDP {
     };
     let line5b = {
       let txt = format!("bypass: {:>2}   ", TF(self.bypass()));
-      if self.bypass() { txt.bright_blue() } else if self.is_digital() { txt.cyan() } else { txt.yellow() }
+      if self.bypass() { txt.green() } else if self.is_digital() { txt.cyan() } else { txt.yellow() }
     };
     let line5c = {
       let txt = format!("alarm: {:1}   ", TF(self.alarm()));

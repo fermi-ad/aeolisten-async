@@ -68,6 +68,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     aeolus_task(sndr, args.aeolus_multicast, args.local_port),
     redis_task(rcvr, args.redis_address, args.redis_port, args.stream_key),
   );
+
   match (ajoin, rjoin) {
     (Ok(_), Ok(_)) => Ok(()),
     (Err(ae), Ok(_)) => { println!("aeolus join: {ae}"); Err(ae) },
